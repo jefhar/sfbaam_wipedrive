@@ -8,4 +8,12 @@ directory, where file name collisions are already resolved.
 
 This relies upon the fact that Wipedrive XML files have a consistent schema.
 
+This requires the following modules:
+```
+getopt
+os
+sys
+xml.etree.ElementTree as ET
+sty
+```
 \#python

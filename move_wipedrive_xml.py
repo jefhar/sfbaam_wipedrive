@@ -1,8 +1,9 @@
-#!/usr/bin/python3
+#!/usr/local/bin/python3
 import getopt
 import os
 import sys
 import xml.etree.ElementTree as ET
+import sty
 
 
 def file_to_path(_file_name, _partitions):
@@ -13,17 +14,12 @@ def file_to_path(_file_name, _partitions):
 
 
 def usage():
-    print('usage: move_wipedrive_xml.py -s <sourcePath> -o <outputPath> -p <partitions> [-f]')
+    print(sty.rs.all + 'usage: move_wipedrive_xml.py -s <sourcePath> -o <outputPath> -p <partitions> [-f]')
 
 
 def main():
-    regular_text = '\033[1;m'
-    success_text = '\033[1;32m'
-    error_text = '\033[1;41m'
-    info_text = '\033[1;33m'
-    warning_text = '\033[33m'
-    result_color = {'2': success_text,
-                    '5': error_text
+    result_color = {'2': sty.fg.green,
+                    '5': sty.bg.red + sty.fg.li_white
                     }
     output_path = './tmp/'
     source_path = '.'
@@ -31,23 +27,24 @@ def main():
     force_overwrite = False
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hfs:o:p:", ['help', 'force', 'sourcepath=', 'outputpath=', 'partitions='])
+        opts, args = getopt.getopt(sys.argv[1:], "hfs:o:p:",
+                                   ['help', 'force', 'sourcepath=', 'outputpath=', 'partitions='])
     except getopt.GetoptError as error:
         print(error)
         usage()
         sys.exit(2)
 
     for opt, arg in opts:
-        if opt in('-h', '--help'):
+        if opt in ('-h', '--help'):
             usage()
             sys.exit()
-        elif opt in('-f', '--force'):
+        elif opt in ('-f', '--force'):
             force_overwrite = True
         elif opt in ('-s', '--sourcepath'):
             source_path = arg.strip()
-        elif opt in('-o', '--outputpath'):
+        elif opt in ('-o', '--outputpath'):
             output_path = arg.strip() + '/'
-        elif opt in('-p', '--partitions'):
+        elif opt in ('-p', '--partitions'):
             partitions = int(arg)
 
     for file in os.listdir(source_path):
@@ -72,7 +69,7 @@ def main():
                 result = "Success" if (action_result.attrib['Index'] == '2') else "Failure"
 
                 print("|--> " + drive_serial.text + ' - ' + gigabytes.text + "GB; Result: ", end='')
-                print (result_color.get(action_result.attrib['Index'], info_text) + result + regular_text)
+                print(result_color.get(action_result.attrib['Index'], sty.fg.cyan) + result + sty.rs.all)
 
             try:
                 os.makedirs(output_directory)
@@ -80,7 +77,8 @@ def main():
                 pass
             file_exists = os.access(new_file, os.F_OK)
             if file_exists and force_overwrite == False:
-                print(warning_text + new_file + ' already exists and --force flag not sent. File not being output.' + regular_text)
+                print(
+                    sty.fg.yellow + new_file + ' already exists and --force flag not sent. File not being output.' + sty.rs.all)
             else:
                 os.rename(file_with_path, new_file)
 
