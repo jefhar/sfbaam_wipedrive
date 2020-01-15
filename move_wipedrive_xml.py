@@ -21,6 +21,7 @@ def main():
     success_text = '\033[1;32m'
     error_text = '\033[1;41m'
     info_text = '\033[1;33m'
+    warning_text = '\033[33m'
     result_color = {'2': success_text,
                     '5': error_text
                     }
@@ -77,7 +78,11 @@ def main():
                 os.makedirs(output_directory)
             except:
                 pass
-            os.rename(file_with_path, new_file) # todo: check for force_overwrite
+            file_exists = os.access(new_file, os.F_OK)
+            if file_exists and force_overwrite == False:
+                print(warning_text + new_file + ' already exists and --force flag not sent. File not being output.' + regular_text)
+            else:
+                os.rename(file_with_path, new_file)
 
     print("\n\nFinished Processing Files.")
 
