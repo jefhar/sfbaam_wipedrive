@@ -65,7 +65,7 @@ def main():
             for Operation in job.findall('Operation'):
                 gigabytes = Operation.find('Gigabytes').text
                 drive_serial = Operation.find('Serial').text
-                action_result = Operation.find('ActionResult').attrib['Index'].int()
+                action_result = int(Operation.find('ActionResult').attrib['Index'])
 
                 if action_result == 2:
                     result = fg.green + "Success"
@@ -95,11 +95,12 @@ def main():
 
     print("\n\nFinished Processing Files.")
     total = success + failure + unknown
-    print("Successful: " + success)
-    print("Failed: " + failure)
+    print("Successful: {success} ({:02.3f}%)".format(success * 100 / total, success=success))
+    print("Failed: {failure} ({:02.3f}%)".format(failure * 100 / total, failure=failure))
     if unknown > 0:
-        print("Unknown: " + unknown)
-    print("Total: " + total)
+        print("Unknown: {unknown} ({:02.3f}%)".format(failure * 100 / total, unknown=unknown))
+    print("Total: {total}".format(total=total))
+
 
 if __name__ == "__main__":
     main()
