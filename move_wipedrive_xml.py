@@ -124,7 +124,9 @@ def main():
     if unverified > 0:
         print("Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
     print("Total drives: {total}".format(total=total))
-    print(times.describe())
+    # print(times.describe())
+    print("\nAverage seconds per terabyte of wipe: {:02.3f} s/g".format(times.mean()))
+    print("Standard Deviation: {:02.3f} s/g".format(times.std()))
 
 
 if __name__ == "__main__":
