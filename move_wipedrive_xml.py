@@ -3,6 +3,8 @@ import getopt
 import os
 import sys
 import xml.etree.ElementTree as ET
+
+import pandas as pd
 from sty import rs, fg, bg
 
 
@@ -11,6 +13,13 @@ def file_to_path(_file_name, _partitions):
     for x in range(0, _partitions):
         _directory = _directory + _file_name[x] + '/'
     return _directory
+
+
+def seconds_per_gig(time_string, size):
+    time_portions = time_string.split(':')
+    time_seconds = int(time_portions[0]) * 3600 + int(time_portions[1]) * 60 + int(time_portions[2])
+    s_p_g = time_seconds / float(size)
+    return s_p_g
 
 
 def usage():
@@ -25,10 +34,15 @@ def main():
     success = 0
     failure = 0
     unknown = 0
+    unverified = 0
+    times = pd.Series([])
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], "hfs:o:p:",
-                                   ['help', 'force', 'sourcepath=', 'outputpath=', 'partitions='])
+        opts, args = getopt.getopt(
+            sys.argv[1:],
+            "hfs:o:p:",
+            ['help', 'force', 'sourcepath=', 'outputpath=', 'partitions=']
+        )
     except getopt.GetoptError as error:
         print(error)
         usage()
@@ -50,7 +64,7 @@ def main():
     for file in os.listdir(source_path):
         file_with_path = source_path + '/' + file
         if file_with_path.endswith('xml'):
-            print('Processing ' + file_with_path)
+            print('\nProcessing ' + file_with_path)
             tree = ET.parse(file_with_path)
             job = tree.getroot().find('Report').find('Jobs').find('Job')
             size = job.find('Operation').find('Gigabytes').text
@@ -59,13 +73,16 @@ def main():
             new_file = output_directory + file
             # print('Create `' + directory + '`')
             # print('Move `' + file + '` to `' +new_file +'`')
-            print("\n+" + new_file, end='')
+            print(" + " + new_file, end='')
             print(' - ' + size + 'GB drives.')
 
             for Operation in job.findall('Operation'):
                 gigabytes = Operation.find('Gigabytes').text
                 drive_serial = Operation.find('Serial').text
                 action_result = int(Operation.find('ActionResult').attrib['Index'])
+                reason = Operation.find('NISTMethodType').text
+                duration = Operation.find('Duration').text
+                times = times.append(pd.Series([seconds_per_gig(duration, gigabytes)]), ignore_index=True)
 
                 if action_result == 2:
                     result = fg.green + "Success"
@@ -76,6 +93,11 @@ def main():
                 else:
                     result = fg.cyan + "Unknown"
                     unknown = unknown + 1
+
+                if reason == 'Unknown':
+                    result = result + rs.all + ' ' + bg.magenta + fg.li_white + Operation.find(
+                        'NISTMethodTypeReason').text
+                    unverified = unverified + 1
 
                 result = result + rs.all
 
@@ -99,7 +121,10 @@ def main():
     print("Failed: {failure} ({:02.3f}%)".format(failure * 100 / total, failure=failure))
     if unknown > 0:
         print("Unknown: {unknown} ({:02.3f}%)".format(failure * 100 / total, unknown=unknown))
-    print("Total: {total}".format(total=total))
+    if unverified > 0:
+        print("Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
+    print("Total drives: {total}".format(total=total))
+    print(times.describe())
 
 
 if __name__ == "__main__":
