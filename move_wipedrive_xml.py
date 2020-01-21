@@ -22,6 +22,16 @@ def seconds_per_gig(time_string, size):
     return s_p_g
 
 
+def extract_serials(output_path, serial, size):
+    output_directory = output_path + 'reports/'
+    try:
+        os.makedirs(output_directory)
+    except:
+        pass
+    f = open(output_directory + size + '.txt', 'a+t')
+    print(serial, file=f)
+
+
 def usage():
     print(rs.all + 'usage: move_wipedrive_xml.py -s <sourcePath> -o <outputPath> -p <partitions> [-f]')
 
@@ -103,6 +113,7 @@ def main():
 
                 print("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result: ", end='')
                 print(result)
+                extract_serials(output_path, drive_serial, gigabytes)
 
             try:
                 os.makedirs(output_directory)
