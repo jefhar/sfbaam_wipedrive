@@ -1,4 +1,5 @@
 #!/usr/local/bin/python3
+import datetime
 import getopt
 import os
 import sys
@@ -74,16 +75,25 @@ def main():
     for file in os.listdir(source_path):
         file_with_path = source_path + '/' + file
         if file_with_path.endswith('xml'):
-            print('\nProcessing ' + file_with_path)
-            tree = ET.parse(file_with_path)
+            xml = file_with_path
+            original_file_parts = xml.split('.')
+            pdf = original_file_parts[0] + '.pdf'
+
+            print('\nProcessing ' + xml)
+            tree = ET.parse(xml)
             job = tree.getroot().find('Report').find('Jobs').find('Job')
             size = job.find('Operation').find('Gigabytes').text
+            server_serial = tree.getroot().find('Report').find('Hardware').find('ComputerSerial').text
+            start_time = tree.getroot().find('Report').find('Jobs').find('Job').find('Operation').find('StartTime').text
+            # <StartTime>Saturday, 04 Jan 2020 14:28:24</StartTime>
+            time_obj = datetime.datetime.strptime(start_time, '%A, %d %b %Y %H:%M:%S')
+            job_datetime = time_obj.strftime('%Y%m%d%H%M%S')
 
-            output_directory = output_path + size + file_to_path(file, partitions)
-            new_file = output_directory + file
+            output_directory = output_path + size + file_to_path(server_serial, partitions)
+            new_file_name = output_directory + server_serial + '_' + job_datetime
             # print('Create `' + directory + '`')
             # print('Move `' + file + '` to `' +new_file +'`')
-            print(" + " + new_file, end='')
+            print(" + " + new_file_name, end='')
             print(' - ' + size + 'GB drives.')
 
             for Operation in job.findall('Operation'):
@@ -119,12 +129,23 @@ def main():
                 os.makedirs(output_directory)
             except:
                 pass
-            file_exists = os.access(new_file, os.F_OK)
-            if file_exists and force_overwrite is False:
+
+            output_xml = new_file_name + '.xml'
+            output_pdf = new_file_name + '.pdf'
+
+            if os.access(output_xml, os.F_OK) and force_overwrite is False:
                 print(
-                    fg.yellow + new_file + ' already exists and --force flag not sent. File not being output.' + rs.all)
+                    fg.yellow + output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
             else:
-                os.rename(file_with_path, new_file)
+                os.rename(xml, output_xml)
+            if os.access(output_pdf, os.F_OK) and force_overwrite is False:
+                print(
+                    fg.yellow + output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
+            else:
+                try:
+                    os.rename(pdf, output_pdf)
+                except:
+                    print(fg.yellow + pdf + ' Does Not Exist')
 
     print("\n\nFinished Processing Files.")
     total = success + failure + unknown
