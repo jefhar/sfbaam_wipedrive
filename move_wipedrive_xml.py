@@ -5,7 +5,6 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 
-import pandas as pd
 from sty import rs, fg, bg
 
 
@@ -46,7 +45,6 @@ def main():
     failure = 0
     unknown = 0
     unverified = 0
-    times = pd.Series([])
 
     try:
         opts, args = getopt.getopt(
@@ -102,7 +100,6 @@ def main():
                 action_result = int(Operation.find('ActionResult').attrib['Index'])
                 reason = Operation.find('NISTMethodType').text
                 duration = Operation.find('Duration').text
-                times = times.append(pd.Series([seconds_per_gig(duration, gigabytes)]), ignore_index=True)
 
                 if action_result == 2:
                     result = fg.green + "Success"
@@ -156,9 +153,6 @@ def main():
     if unverified > 0:
         print("Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
     print("Total drives: {total}".format(total=total))
-    # print(times.describe())
-    print("\nAverage seconds per terabyte of wipe: {:02.3f} s/g".format(times.mean()))
-    print("Standard Deviation: {:02.3f} s/g".format(times.std()))
 
 
 if __name__ == "__main__":
