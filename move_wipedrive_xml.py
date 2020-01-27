@@ -4,6 +4,7 @@ import getopt
 import logging
 import os
 import sys
+import time
 import xml.etree.ElementTree as ET
 
 from sty import rs, fg, bg
@@ -38,7 +39,7 @@ def usage():
 
 
 def main():
-    logging.basicConfig(filename='move_wipedrive.log', level=logging.DEBUG)
+    logging.basicConfig(filename='move_wipedrive.log', level=logging.INFO)
     output_path = './tmp/'
     source_path = '.'
     partitions = 4
@@ -78,12 +79,16 @@ def main():
     logging.info("partitions: " + str(partitions))
     logging.info("force: " + str(force_overwrite))
 
+    start = time.time()
     for file in os.listdir(source_path):
         file_with_path = source_path + '/' + file
         if file_with_path.endswith('xml'):
             xml = file_with_path
             original_file_parts = xml.split('.')
             pdf = original_file_parts[0] + '.pdf'
+            logging.info(xml)
+            logging.info(pdf)
+            file_output_path = output_path
 
             print('Processing ' + xml)
             logging.info("Processing " + xml)
@@ -108,33 +113,34 @@ def main():
                 drive_serial = Operation.find('Serial').text
                 action_result = int(Operation.find('ActionResult').attrib['Index'])
                 method_type = Operation.find('NISTMethodType').text
+                type_reason = Operation.find('NISTMethodTypeReason').text
+                if type_reason is None:
+                    type_reason = 'Unknown'
 
                 if action_result == 2:
                     result = "Success"
                     success = success + 1
-                    logging.info(xml + " : " + drive_serial + " : " + result)
+                    logging.debug(xml + " : " + drive_serial + " : " + result)
                 elif action_result == 5:
                     result = "Failure"
                     failure = failure + 1
                     logging.warning(xml + " : " + drive_serial + " : " + result)
+                    if type_reason == "Wipe did not complete successfully.":
+                        method_type = "Failure"
                 else:
                     result = "Unknown"
                     unknown = unknown + 1
                     logging.warning(xml + " : " + drive_serial + " : " + result)
 
                 if method_type == 'Unknown':
-                    type_reason = Operation.find('NISTMethodTypeReason').text
-                    if type_reason is None:
-                        type_reason = 'Unknown'
-
                     if not had_error:
-                        output_path = output_path + '/' + type_reason.replace(' ', '').replace('.', '')
+                        file_output_path = file_output_path + '/' + type_reason.replace(' ', '').replace('.', '')
                         had_error = True
                     result = result + ' ' + type_reason
                     unverified = unverified + 1
 
                 result = result
-                output_directory = output_path + size + file_to_path(server_serial, partitions)
+                output_directory = file_output_path + '/' + size + file_to_path(server_serial, partitions)
                 logging.info("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result:  " + result)
                 extract_serials(output_path, drive_serial, gigabytes)
             try:
@@ -142,29 +148,32 @@ def main():
             except:
                 pass
 
-            new_file_name = output_directory + server_serial + '_' + job_datetime
+            new_file_name = output_directory + '/' + server_serial + '_' + job_datetime
             output_xml = new_file_name + '.xml'
             output_pdf = new_file_name + '.pdf'
 
             logging.info(file + " to " + output_xml)
-            logging.info(xml + ' has ' + size + 'GB drives.')
+            logging.debug(xml + ' has ' + size + 'GB drives.')
 
             if os.access(output_xml, os.F_OK) and force_overwrite is False:
                 logging.warning(
                     output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
             else:
                 os.rename(xml, output_xml)
+                logging.info('Copying `' + xml + '` to `' + output_xml + '`')
+
             if os.access(output_pdf, os.F_OK) and force_overwrite is False:
                 logging.warning(
                     output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
             else:
                 try:
                     os.rename(pdf, output_pdf)
+                    logging.info('Copying `' + pdf + '` to `' + output_pdf + '`')
                 except:
                     logging.warning(pdf + ' Does Not Exist. Please recreate it from `' + xml + '`.')
 
-            logging.info('')
     print("\n\nFinished Processing Files.")
+    end = time.time()
     total = success + failure + unknown
     logging.info("Complete.")
     print("Successful: {success} ({:02.3f}%)".format(success * 100 / total, success=success))
@@ -180,6 +189,7 @@ def main():
             "Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
     print("Total drives: {total}".format(total=total))
     logging.info("Total drives: {total}".format(total=total))
+    logging.info("Complete in {s}.".format(s=end - start))
 
 
 if __name__ == "__main__":
