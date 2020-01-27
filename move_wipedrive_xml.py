@@ -1,6 +1,7 @@
 #!/usr/local/bin/python3
 import datetime
 import getopt
+import logging
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -37,6 +38,7 @@ def usage():
 
 
 def main():
+    logging.basicConfig(filename='move_wipedrive.log', level=logging.DEBUG)
     output_path = './tmp/'
     source_path = '.'
     partitions = 4
@@ -70,6 +72,12 @@ def main():
         elif opt in ('-p', '--partitions'):
             partitions = int(arg)
 
+    logging.info("Beginning moving process.")
+    logging.info("source_path: " + source_path)
+    logging.info("output_path: " + output_path)
+    logging.info("partitions: " + str(partitions))
+    logging.info("force: " + str(force_overwrite))
+
     for file in os.listdir(source_path):
         file_with_path = source_path + '/' + file
         if file_with_path.endswith('xml'):
@@ -77,82 +85,101 @@ def main():
             original_file_parts = xml.split('.')
             pdf = original_file_parts[0] + '.pdf'
 
-            print('\nProcessing ' + xml)
-            tree = ET.parse(xml)
+            print('Processing ' + xml)
+            logging.info("Processing " + xml)
+            try:
+                tree = ET.parse(xml)
+            except ET.ParseError as e:
+                logging.error(e)
+                logging.error('Skipping ' + xml)
+                continue
             job = tree.getroot().find('Report').find('Jobs').find('Job')
             size = job.find('Operation').find('Gigabytes').text
             server_serial = tree.getroot().find('Report').find('Hardware').find('ComputerSerial').text
+            server_serial = server_serial.replace('/', '_')
             start_time = tree.getroot().find('Report').find('Jobs').find('Job').find('Operation').find('StartTime').text
             # <StartTime>Saturday, 04 Jan 2020 14:28:24</StartTime>
             time_obj = datetime.datetime.strptime(start_time, '%A, %d %b %Y %H:%M:%S')
             job_datetime = time_obj.strftime('%Y%m%d%H%M%S')
-
-            output_directory = output_path + size + file_to_path(server_serial, partitions)
-            new_file_name = output_directory + server_serial + '_' + job_datetime
-            # print('Create `' + directory + '`')
-            # print('Move `' + file + '` to `' +new_file +'`')
-            print(" + " + new_file_name, end='')
-            print(' - ' + size + 'GB drives.')
+            had_error = False
 
             for Operation in job.findall('Operation'):
                 gigabytes = Operation.find('Gigabytes').text
                 drive_serial = Operation.find('Serial').text
                 action_result = int(Operation.find('ActionResult').attrib['Index'])
-                reason = Operation.find('NISTMethodType').text
-                duration = Operation.find('Duration').text
+                method_type = Operation.find('NISTMethodType').text
 
                 if action_result == 2:
-                    result = fg.green + "Success"
+                    result = "Success"
                     success = success + 1
+                    logging.info(xml + " : " + drive_serial + " : " + result)
                 elif action_result == 5:
-                    result = bg.red + fg.li_white + "Failure"
+                    result = "Failure"
                     failure = failure + 1
+                    logging.warning(xml + " : " + drive_serial + " : " + result)
                 else:
-                    result = fg.cyan + "Unknown"
+                    result = "Unknown"
                     unknown = unknown + 1
+                    logging.warning(xml + " : " + drive_serial + " : " + result)
 
-                if reason == 'Unknown':
-                    result = result + rs.all + ' ' + bg.magenta + fg.li_white + Operation.find(
-                        'NISTMethodTypeReason').text
+                if method_type == 'Unknown':
+                    type_reason = Operation.find('NISTMethodTypeReason').text
+                    if type_reason is None:
+                        type_reason = 'Unknown'
+
+                    if not had_error:
+                        output_path = output_path + '/' + type_reason.replace(' ', '').replace('.', '')
+                        had_error = True
+                    result = result + ' ' + type_reason
                     unverified = unverified + 1
 
-                result = result + rs.all
-
-                print("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result: ", end='')
-                print(result)
+                result = result
+                output_directory = output_path + size + file_to_path(server_serial, partitions)
+                logging.info("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result:  " + result)
                 extract_serials(output_path, drive_serial, gigabytes)
-
             try:
                 os.makedirs(output_directory)
             except:
                 pass
 
+            new_file_name = output_directory + server_serial + '_' + job_datetime
             output_xml = new_file_name + '.xml'
             output_pdf = new_file_name + '.pdf'
 
+            logging.info(file + " to " + output_xml)
+            logging.info(xml + ' has ' + size + 'GB drives.')
+
             if os.access(output_xml, os.F_OK) and force_overwrite is False:
-                print(
-                    fg.yellow + output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
+                logging.warning(
+                    output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
             else:
                 os.rename(xml, output_xml)
             if os.access(output_pdf, os.F_OK) and force_overwrite is False:
-                print(
-                    fg.yellow + output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
+                logging.warning(
+                    output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
             else:
                 try:
                     os.rename(pdf, output_pdf)
                 except:
-                    print(fg.yellow + pdf + ' Does Not Exist')
+                    logging.warning(pdf + ' Does Not Exist. Please recreate it from `' + xml + '`.')
 
+            logging.info('')
     print("\n\nFinished Processing Files.")
     total = success + failure + unknown
+    logging.info("Complete.")
     print("Successful: {success} ({:02.3f}%)".format(success * 100 / total, success=success))
+    logging.info("Successful: {success} ({:02.3f}%)".format(success * 100 / total, success=success))
     print("Failed: {failure} ({:02.3f}%)".format(failure * 100 / total, failure=failure))
+    logging.info("Failed: {failure} ({:02.3f}%)".format(failure * 100 / total, failure=failure))
     if unknown > 0:
         print("Unknown: {unknown} ({:02.3f}%)".format(failure * 100 / total, unknown=unknown))
+        logging.info("Unknown: {unknown} ({:02.3f}%)".format(failure * 100 / total, unknown=unknown))
     if unverified > 0:
         print("Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
+        logging.info(
+            "Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
     print("Total drives: {total}".format(total=total))
+    logging.info("Total drives: {total}".format(total=total))
 
 
 if __name__ == "__main__":
