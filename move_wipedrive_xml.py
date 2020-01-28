@@ -86,8 +86,8 @@ def main():
             xml = file_with_path
             original_file_parts = xml.split('.')
             pdf = original_file_parts[0] + '.pdf'
-            logging.info(xml)
-            logging.info(pdf)
+            logging.debug(xml)
+            logging.debug(pdf)
             file_output_path = output_path
 
             print('Processing ' + xml)
@@ -96,7 +96,7 @@ def main():
                 tree = ET.parse(xml)
             except ET.ParseError as e:
                 logging.error(e)
-                logging.error('Skipping ' + xml)
+                logging.warning('Skipping ' + xml + ' as not well-formed.')
                 continue
             job = tree.getroot().find('Report').find('Jobs').find('Job')
             size = job.find('Operation').find('Gigabytes').text
@@ -124,13 +124,13 @@ def main():
                 elif action_result == 5:
                     result = "Failure"
                     failure = failure + 1
-                    logging.warning(xml + " : " + drive_serial + " : " + result)
+                    logging.debug(xml + " : " + drive_serial + " : " + result)
                     if type_reason == "Wipe did not complete successfully.":
                         method_type = "Failure"
                 else:
                     result = "Unknown"
                     unknown = unknown + 1
-                    logging.warning(xml + " : " + drive_serial + " : " + result)
+                    logging.debug(xml + " : " + drive_serial + " : " + result)
 
                 if method_type == 'Unknown':
                     if not had_error:
@@ -141,7 +141,7 @@ def main():
 
                 result = result
                 output_directory = file_output_path + '/' + size + file_to_path(server_serial, partitions)
-                logging.info("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result:  " + result)
+                logging.debug("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result:  " + result)
                 extract_serials(output_path, drive_serial, gigabytes)
             try:
                 os.makedirs(output_directory)
@@ -152,7 +152,7 @@ def main():
             output_xml = new_file_name + '.xml'
             output_pdf = new_file_name + '.pdf'
 
-            logging.info(file + " to " + output_xml)
+            logging.debug(file + " to " + output_xml)
             logging.debug(xml + ' has ' + size + 'GB drives.')
 
             if os.access(output_xml, os.F_OK) and force_overwrite is False:
@@ -168,7 +168,7 @@ def main():
             else:
                 try:
                     os.rename(pdf, output_pdf)
-                    logging.info('Copying `' + pdf + '` to `' + output_pdf + '`')
+                    logging.debug('Copying `' + pdf + '` to `' + output_pdf + '`')
                 except:
                     logging.warning(pdf + ' Does Not Exist. Please recreate it from `' + xml + '`.')
 
@@ -189,7 +189,7 @@ def main():
             "Total unverified: {unverified} ({:02.3f}%)".format(unverified * 100 / total, unverified=unverified))
     print("Total drives: {total}".format(total=total))
     logging.info("Total drives: {total}".format(total=total))
-    logging.info("Complete in {s}.".format(s=end - start))
+    logging.info("Complete in {s} seconds.".format(s=end - start))
 
 
 if __name__ == "__main__":
