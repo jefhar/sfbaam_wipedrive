@@ -1,13 +1,12 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 import datetime
 import getopt
 import logging
 import os
+import shutil
 import sys
 import time
 import xml.etree.ElementTree as ET
-
-from sty import rs, fg, bg
 
 
 def file_to_path(_file_name, _partitions):
@@ -24,22 +23,23 @@ def seconds_per_gig(time_string, size):
     return s_p_g
 
 
-def extract_serials(output_path, serial, size):
+def record_serials(output_path, serials, size, result):
     output_directory = output_path + 'reports/'
     try:
         os.makedirs(output_directory)
     except:
         pass
     f = open(output_directory + size + '.txt', 'a+t')
-    print(serial, file=f)
+    for i in range(len(serials)):
+        print("{serial}:{result}".format(serial=serials[i], result=result), file=f)
 
 
 def usage():
-    print(rs.all + 'usage: move_wipedrive_xml.py -s <sourcePath> -o <outputPath> -p <partitions> [-f]')
+    print('usage: move_wipedrive_xml.py -s <sourcePath> -o <outputPath> -p <partitions> [-f]')
 
 
 def main():
-    logging.basicConfig(filename='move_wipedrive.log', level=logging.INFO)
+    logging.basicConfig(filename='move_wipedrive.log', level=logging.DEBUG)
     output_path = './tmp/'
     source_path = '.'
     partitions = 4
@@ -85,10 +85,11 @@ def main():
         if file_with_path.endswith('xml'):
             xml = file_with_path
             original_file_parts = xml.split('.')
-            pdf = original_file_parts[0] + '.pdf'
+            pdf = original_file_parts[0] + '.pdf'  # Need to know if -s contains a '.', though.
             logging.debug(xml)
             logging.debug(pdf)
             file_output_path = output_path
+            drive_serials = []
 
             print('Processing ' + xml)
             logging.info("Processing " + xml)
@@ -107,10 +108,12 @@ def main():
             time_obj = datetime.datetime.strptime(start_time, '%A, %d %b %Y %H:%M:%S')
             job_datetime = time_obj.strftime('%Y%m%d%H%M%S')
             had_error = False
+            gigabytes = 0
 
             for Operation in job.findall('Operation'):
                 gigabytes = Operation.find('Gigabytes').text
                 drive_serial = Operation.find('Serial').text
+                drive_serials = drive_serials + [drive_serial]
                 action_result = int(Operation.find('ActionResult').attrib['Index'])
                 method_type = Operation.find('NISTMethodType').text
                 type_reason = Operation.find('NISTMethodTypeReason').text
@@ -136,13 +139,12 @@ def main():
                     if not had_error:
                         file_output_path = file_output_path + '/' + type_reason.replace(' ', '').replace('.', '')
                         had_error = True
-                    result = result + ' ' + type_reason
+                    result = result + ': ' + type_reason
                     unverified = unverified + 1
 
                 result = result
                 output_directory = file_output_path + '/' + size + file_to_path(server_serial, partitions)
                 logging.debug("|--> " + drive_serial + ' - ' + gigabytes + "GB; Result:  " + result)
-                extract_serials(output_path, drive_serial, gigabytes)
             try:
                 os.makedirs(output_directory)
             except:
@@ -155,22 +157,28 @@ def main():
             logging.debug(file + " to " + output_xml)
             logging.debug(xml + ' has ' + size + 'GB drives.')
 
-            if os.access(output_xml, os.F_OK) and force_overwrite is False:
-                logging.warning(
-                    output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
-            else:
-                os.rename(xml, output_xml)
-                logging.info('Copying `' + xml + '` to `' + output_xml + '`')
+            # if os.access(output_xml, os.F_OK) and force_overwrite is False:
+            #     logging.warning(
+            #         output_xml + ' already exists and --force flag not sent. File not being output.')
+            # else:
+            #     os.rename(xml, output_xml)
+            #     logging.info('Copying `' + xml + '` to `' + output_xml + '`')
 
             if os.access(output_pdf, os.F_OK) and force_overwrite is False:
                 logging.warning(
-                    output_xml + ' already exists and --force flag not sent. File not being output.' + rs.all)
+                    output_pdf + ' already exists and --force flag not sent. File not being output.')
             else:
+                record_serials(output_path, drive_serials, gigabytes, result)
                 try:
                     os.rename(pdf, output_pdf)
                     logging.debug('Copying `' + pdf + '` to `' + output_pdf + '`')
                 except:
                     logging.warning(pdf + ' Does Not Exist. Please recreate it from `' + xml + '`.')
+                    try:
+                        os.makedirs(file_output_path + "/missing/")
+                    except:
+                        pass
+                    shutil.copy(xml, file_output_path + "/missing/")
 
     print("\n\nFinished Processing Files.")
     end = time.time()
