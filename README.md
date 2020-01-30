@@ -2,20 +2,24 @@
 
 Using Wipedrive to wipe drives creates an XML file named by server serial number.
 
-The boss wants the files organized by drive size. This moves the files into buckets
-labelled by drive size. Before the files get here, they are all dumped into a common
-directory, where file name collisions are already resolved.
+The boss wants the files organized by drive size. This moves the files into buckets labelled by drive size. As long as
+the XML and PDF file are named the same, except for the extension, they can be organized into the structure.
 
 This relies upon the fact that Wipedrive XML files have a consistent schema.
 
-Create the dockerfile:
+Create your own dockerfile:
 ```
-docker build -t wipedrive .
+docker build -t move_wipedrive .
+```
+
+Or [pull the dockerfile](https://hub.docker.com/r/jefhar/move_wipedrive):
+```
+docker pull jefhar/move_wipedrive
 ```
 
 Run the image:
 ```
-docker run -it --rm -v"($ROOT_DIRECTORY_OF_ALL_XML_FILES):/app" wipedrive
+docker run -it --rm -v"($ROOT_DIRECTORY_OF_ALL_XML_FILES):/app" move_wipedrive
 flattendirs /app
 move_wipedrive --help
 ```
@@ -41,6 +45,10 @@ move `Q345678.pdf` to `Q/3/4/Q345678.pdf`. Beneficial if you have large numbers 
 performing the drive wipes. Given `-p0`, `move_wipedrive` will move the file to `/Q345678.pdf`.
 
 The `-f` parameter will force an output file to be re-written.
+
+XML files for which there is no matching PDF will be moved to `<outputPath>/missing`, and PDF files that show a wiping
+error will be moved into a folder underneath `<ouputPath>` that shows the error. This simply filters files for manual
+review.
 
 #### Why
 In our environment, a drive is wiped, and the resulting XML log and PDF file are named `log.xml` and `log.pdf`. The
